@@ -21,7 +21,8 @@ No .NET, no Mono, no ScriptHookVDotNet required.
 
 **Performance**
 - **FPS counter** (top right)
-- **FPS Booster** with 4 levels: lowers traffic density and the model budget and removes distant **empty** cars. **NPCs are never deleted**, so the city stays alive
+- **FPS Booster** with 5 levels (OFF, MEDIUM, HIGH, ULTRA, **MAX**): lowers traffic density and the model budget and removes distant **empty** cars. **NPCs are never deleted**, so the city stays alive
+- **MAX** debloats GTA: no garbage trucks, random boats, trains, far-distance traffic, distant sirens or parked cars, clear weather. NPCs, police and chases stay, so it's still fun
 - **Anti-Lag Protection**: detects stutter or low FPS and automatically turns off heavy cheats, clears your wanted level and switches the booster to HIGH
 
 ---

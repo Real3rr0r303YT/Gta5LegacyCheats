@@ -31,9 +31,9 @@ static int weatherIdx = 0;
 static const char* weathers[] = { "EXTRASUNNY","CLEAR","CLOUDS","SMOG","FOGGY","OVERCAST","RAIN",
                                   "THUNDER","CLEARING","SNOW","BLIZZARD","SNOWLIGHT","XMAS" };
 static int boost = 0;
-static const char* boostNames[2][4] = { { "OFF","MEDIUM","HIGH","ULTRA" }, { "AUS","MITTEL","STARK","ULTRA" } };
+static const char* boostNames[2][5] = { { "OFF","MEDIUM","HIGH","ULTRA","MAX" }, { "AUS","MITTEL","STARK","ULTRA","MAX" } };
 // NPCs and traffic are never removed completely - the world stays alive
-static float boostDens[] = { 1.0f, 0.75f, 0.55f, 0.35f };
+static float boostDens[] = { 1.0f, 0.75f, 0.55f, 0.35f, 0.30f };
 
 static std::string msg;
 static DWORD msgUntil = 0;
@@ -183,9 +183,24 @@ static void Spawn(const char* model, const std::string& label)
     msg = (lang ? "Gespawnt: " : "Spawned: ") + L(label); msgUntil = GetTickCount() + 2500;
 }
 
+// MAX: debloats ambient extras that cost FPS but add little fun.
+// NPCs, police, cars and chases all stay.
+static void ApplyMax(bool on)
+{
+    VEHICLE::SET_GARBAGE_TRUCKS(!on);
+    VEHICLE::SET_RANDOM_BOATS(!on);
+    VEHICLE::SET_RANDOM_TRAINS(!on);
+    VEHICLE::SET_FAR_DRAW_VEHICLES(!on);
+    VEHICLE::DISTANT_COP_CAR_SIRENS(!on);
+    if (on) GAMEPLAY::SET_WEATHER_TYPE_NOW_PERSIST((char*)"CLEAR");
+    else GAMEPLAY::CLEAR_WEATHER_TYPE_PERSIST();
+}
+
 static void CycleBoost()
 {
-    boost = (boost + 1) % 4;
+    boost = (boost + 1) % 5;
+    if (boost == 4) ApplyMax(true);
+    else if (boost == 0) ApplyMax(false);
     msg = std::string("FPS Booster: ") + boostNames[lang][boost]; msgUntil = GetTickCount() + 2500;
 }
 
@@ -444,12 +459,12 @@ static void Update()
         PED::SET_SCENARIO_PED_DENSITY_MULTIPLIER_THIS_FRAME(d, d);
         VEHICLE::SET_VEHICLE_DENSITY_MULTIPLIER_THIS_FRAME(d);
         VEHICLE::SET_RANDOM_VEHICLE_DENSITY_MULTIPLIER_THIS_FRAME(d);
-        VEHICLE::SET_PARKED_VEHICLE_DENSITY_MULTIPLIER_THIS_FRAME(d * 0.5f);
+        VEHICLE::SET_PARKED_VEHICLE_DENSITY_MULTIPLIER_THIS_FRAME(boost == 4 ? 0.0f : d * 0.5f);
         STREAMING::SET_REDUCE_PED_MODEL_BUDGET(boost >= 2);
         STREAMING::SET_REDUCE_VEHICLE_MODEL_BUDGET(boost >= 2);
         static DWORD lastClean = 0;
-        DWORD iv = boost == 3 ? 3000 : (boost == 2 ? 5000 : 10000);
-        float maxD = boost == 3 ? 50.0f : (boost == 2 ? 80.0f : 150.0f);
+        DWORD iv = boost == 4 ? 2000 : (boost == 3 ? 3000 : (boost == 2 ? 5000 : 10000));
+        float maxD = boost == 4 ? 40.0f : (boost == 3 ? 50.0f : (boost == 2 ? 80.0f : 150.0f));
         if (GetTickCount() - lastClean > iv) { lastClean = GetTickCount(); CleanWorld(maxD); }
     }
     else
