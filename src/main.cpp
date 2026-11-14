@@ -8,6 +8,8 @@
 #include <vector>
 #include <functional>
 #include <cstdio>
+#include <map>
+#include <cstring>
 #include "main.h"
 #include "natives.h"
 #include "types.h"
@@ -19,7 +21,8 @@ static bool menuOpen = false;
 static int sel = 0, topI = 0;
 static const int VIS = 15;
 
-static int iFps, iBoost, iAntiLag;
+static int iFps, iBoost, iAntiLag, iLang;
+static int lang = 0; // 0 = English, 1 = Deutsch
 static int iGod, iRun, iSwim, iJump, iDrunk, iSlowAim, iGrav, iMelee, iExp, iFire, iSlide;
 
 static int slowIdx = 0;
@@ -28,8 +31,9 @@ static int weatherIdx = 0;
 static const char* weathers[] = { "EXTRASUNNY","CLEAR","CLOUDS","SMOG","FOGGY","OVERCAST","RAIN",
                                   "THUNDER","CLEARING","SNOW","BLIZZARD","SNOWLIGHT","XMAS" };
 static int boost = 0;
-static const char* boostNames[] = { "OFF","MEDIUM","HIGH","ULTRA" };
-static float boostDens[] = { 1.0f, 0.5f, 0.2f, 0.0f };
+static const char* boostNames[2][4] = { { "OFF","MEDIUM","HIGH","ULTRA" }, { "AUS","MITTEL","STARK","ULTRA" } };
+// NPCs and traffic are never removed completely - the world stays alive
+static float boostDens[] = { 1.0f, 0.75f, 0.55f, 0.35f };
 
 static std::string msg;
 static DWORD msgUntil = 0;
@@ -44,8 +48,90 @@ static DWORD lastFix = 0;
 static int spikes = 0;
 static DWORD spikeWin = 0;
 
+// ---------------------------------------------------------------- language
+static const std::map<std::string, std::string> DE = {
+    {"FPS Counter","FPS-Anzeige"},
+    {"Anti-Lag Protection","Anti-Lag Schutz"},
+    {"Run Anti-Lag Now","Anti-Lag jetzt ausfuehren"},
+    {"Language: English","Sprache: Deutsch"},
+    {"Invincibility","Unsterblichkeit"},
+    {"Max Health & Armor","Max Leben & Ruestung"},
+    {"All Weapons & Ammo","Alle Waffen & Munition"},
+    {"Recharge Special Ability","Spezialfaehigkeit aufladen"},
+    {"Wanted Level +1","Fahndung +1"},
+    {"Wanted Level -1","Fahndung -1"},
+    {"Clear Wanted Level","Fahndung loeschen"},
+    {"Fast Run","Schnell rennen"},
+    {"Fast Swim","Schnell schwimmen"},
+    {"Super Jump","Super-Sprung"},
+    {"Parachute","Fallschirm"},
+    {"Drunk Mode","Betrunken"},
+    {"Skyfall","Skyfall"},
+    {"Slow Motion (Steps)","Zeitlupe (Stufen)"},
+    {"Slow Motion Aim","Zeitlupe beim Zielen"},
+    {"Low Gravity","Niedrige Schwerkraft"},
+    {"Explosive Melee","Explosive Nahkampfangriffe"},
+    {"Explosive Ammo","Explosive Munition"},
+    {"Flaming Ammo","Brandmunition"},
+    {"Slidey Cars","Rutschige Autos"},
+    {"Change Weather","Wetter wechseln"},
+    {"Teleport to Waypoint","Teleport zum Wegpunkt"},
+    {"Repair Vehicle","Fahrzeug reparieren"},
+    {"BMX - Bicycle","BMX - Fahrrad"},
+    {"Buzzard - Attack Helicopter","Buzzard - Kampfhubschrauber"},
+    {"Caddy - Golf Cart","Caddy - Golfwagen"},
+    {"Comet - Sports Car","Comet - Sportwagen"},
+    {"Duster - Crop Duster Plane","Duster - Spruehflugzeug"},
+    {"Mallard - Stunt Plane","Mallard - Stuntflugzeug"},
+    {"PCJ-600 - Motorcycle","PCJ-600 - Motorrad"},
+    {"Rapid GT - Sports Car","Rapid GT - Sportwagen"},
+    {"Sanchez - Dirt Bike","Sanchez - Crossbike"},
+    {"Stretch - Limousine","Stretch - Limousine"},
+    {"Trashmaster - Garbage Truck","Trashmaster - Muellwagen"},
+    {"Dodo - Seaplane","Dodo - Wasserflugzeug"},
+    {"Duke O'Death - Armored Car","Duke O'Death - Panzerauto"},
+    {"Kraken - Submarine","Kraken - U-Boot"},
+    {"Rhino - Military Tank","Rhino - Militaer-Panzer"},
+    {"Crusader - Military Jeep","Crusader - Militaer-Jeep"},
+    {"Barracks - Military Truck","Barracks - Militaer-LKW"},
+    {"Lazer - Military Fighter Jet","Lazer - Militaer-Kampfjet"},
+    {"Annihilator - Military Heli","Annihilator - Militaer-Heli"},
+    {"Titan - Military Cargo Plane","Titan - Militaer-Transporter"},
+    {"Model not found","Modell nicht gefunden"},
+    {"No waypoint set","Kein Wegpunkt gesetzt"},
+    {"Teleported","Teleportiert"},
+    {"Healed","Geheilt"},
+    {"Weapons received","Waffen erhalten"},
+    {"Recharged","Aufgeladen"},
+    {"Wanted level cleared","Fahndung geloescht"},
+    {"Vehicle repaired","Fahrzeug repariert"},
+    {"Anti-Lag: heavy cheats off, wanted cleared, boost HIGH","Anti-Lag: Cheats aus, Fahndung weg, Boost STARK"},
+    {"3rr0r Story Client loaded - R + Left / F4","3rr0r Story Client geladen - R + Links / F4"},
+};
+static std::string L(const std::string& s)
+{
+    if (lang == 0) return s;
+    auto it = DE.find(s);
+    return it != DE.end() ? it->second : s;
+}
+static const char* OnTxt(bool on) { return lang ? (on ? "AN" : "AUS") : (on ? "ON" : "OFF"); }
+
+static void SaveLang()
+{
+    FILE* f = fopen("3rr0rClient.ini", "w");
+    if (f) { fprintf(f, "lang=%s\n", lang ? "de" : "en"); fclose(f); }
+}
+static void LoadLang()
+{
+    FILE* f = fopen("3rr0rClient.ini", "r");
+    if (!f) return;
+    char b[32] = { 0 };
+    if (fgets(b, sizeof(b), f)) lang = (strstr(b, "de") != nullptr) ? 1 : 0;
+    fclose(f);
+}
+
 // ---------------------------------------------------------------- helpers
-static void Notify(const std::string& s) { msg = s; msgUntil = GetTickCount() + 2500; }
+static void Notify(const std::string& s) { msg = L(s); msgUntil = GetTickCount() + 2500; }
 static Ped Me() { return PLAYER::PLAYER_PED_ID(); }
 static Hash H(const char* s) { return GAMEPLAY::GET_HASH_KEY((char*)s); }
 static int AddA(const std::string& n, std::function<void()> a) { items.push_back({ n, false, false, a }); return (int)items.size() - 1; }
@@ -94,14 +180,13 @@ static void Spawn(const char* model, const std::string& label)
     STREAMING::SET_MODEL_AS_NO_LONGER_NEEDED(h);
     lastSpawn = v;
     { Vehicle tmp = v; ENTITY::SET_VEHICLE_AS_NO_LONGER_NEEDED(&tmp); }
-    Notify("Spawned: " + label);
+    msg = (lang ? "Gespawnt: " : "Spawned: ") + L(label); msgUntil = GetTickCount() + 2500;
 }
 
 static void CycleBoost()
 {
     boost = (boost + 1) % 4;
-    items[iBoost].name = std::string("FPS Booster: ") + boostNames[boost];
-    Notify(std::string("FPS Booster: ") + boostNames[boost]);
+    msg = std::string("FPS Booster: ") + boostNames[lang][boost]; msgUntil = GetTickCount() + 2500;
 }
 
 static void TeleportWaypoint()
@@ -122,7 +207,8 @@ static void TeleportWaypoint()
     Notify("Teleported");
 }
 
-// Deletes ambient vehicles/peds further away than maxD (never mission entities or the player)
+// Removes only EMPTY, abandoned ambient vehicles far away.
+// NPCs are never deleted, and no vehicle with anyone inside is touched.
 static void CleanWorld(float maxD)
 {
     Ped me = Me();
@@ -136,32 +222,13 @@ static void CleanWorld(float maxD)
         Vehicle v = worldBuf[i];
         if (v == myV || v == lastSpawn || !ENTITY::DOES_ENTITY_EXIST(v)) continue;
         if (ENTITY::IS_ENTITY_A_MISSION_ENTITY(v)) continue;
+        if (!VEHICLE::IS_VEHICLE_SEAT_FREE(v, -1)) continue;
+        if (VEHICLE::GET_VEHICLE_NUMBER_OF_PASSENGERS(v) > 0) continue;
         Vector3 q = ENTITY::GET_ENTITY_COORDS(v, 1);
         float dx = q.x - c.x, dy = q.y - c.y, dz = q.z - c.z;
         if (dx * dx + dy * dy + dz * dz < md2) continue;
-        Ped drv = VEHICLE::GET_PED_IN_VEHICLE_SEAT(v, -1);
-        if (drv && ENTITY::DOES_ENTITY_EXIST(drv))
-        {
-            if (drv == me || ENTITY::IS_ENTITY_A_MISSION_ENTITY(drv) || PED::IS_PED_A_PLAYER(drv)) continue;
-            ENTITY::SET_ENTITY_AS_MISSION_ENTITY(drv, 1, 1);
-            PED::DELETE_PED(&drv);
-        }
         ENTITY::SET_ENTITY_AS_MISSION_ENTITY(v, 1, 1);
         VEHICLE::DELETE_VEHICLE(&v);
-    }
-
-    n = worldGetAllPeds(worldBuf, 1024);
-    for (int i = 0; i < n; i++)
-    {
-        Ped pd = worldBuf[i];
-        if (pd == me || !ENTITY::DOES_ENTITY_EXIST(pd)) continue;
-        if (PED::IS_PED_A_PLAYER(pd) || ENTITY::IS_ENTITY_A_MISSION_ENTITY(pd)) continue;
-        if (PED::IS_PED_IN_ANY_VEHICLE(pd, 0)) continue;
-        Vector3 q = ENTITY::GET_ENTITY_COORDS(pd, 1);
-        float dx = q.x - c.x, dy = q.y - c.y, dz = q.z - c.z;
-        if (dx * dx + dy * dy + dz * dz < md2) continue;
-        ENTITY::SET_ENTITY_AS_MISSION_ENTITY(pd, 1, 1);
-        PED::DELETE_PED(&pd);
     }
 }
 
@@ -174,10 +241,10 @@ static void DoAntiLag()
     slowIdx = 0;
     GAMEPLAY::SET_TIME_SCALE(1.0f);
     PLAYER::CLEAR_PLAYER_WANTED_LEVEL(PLAYER::PLAYER_ID());
-    if (boost < 3) { boost = 2; CycleBoost(); }
+    if (boost < 2) boost = 2;
     Vector3 c = ENTITY::GET_ENTITY_COORDS(Me(), 1);
     FIRE::STOP_FIRE_IN_RANGE(c.x, c.y, c.z, 100.0f);
-    Notify("Anti-Lag: heavy cheats off, wanted cleared, boost ULTRA");
+    Notify("Anti-Lag: heavy cheats off, wanted cleared, boost HIGH");
 }
 
 // Triggers on 5+ frame spikes (>100 ms) within 3 s, or below 30 FPS for 2 s
@@ -204,6 +271,7 @@ static void Build()
     iBoost = AddA("FPS Booster: OFF", [] { CycleBoost(); });
     iAntiLag = AddT("Anti-Lag Protection"); items[iAntiLag].on = true;
     AddA("Run Anti-Lag Now", [] { DoAntiLag(); });
+    iLang = AddA("Language: English", [] { lang = 1 - lang; SaveLang(); });
 
     // Player
     iGod = AddT("Invincibility");
@@ -278,7 +346,7 @@ static void Move(int d)
 
 static void Activate(Item& it)
 {
-    if (it.toggle) { it.on = !it.on; Notify(it.name + (it.on ? ": ON" : ": OFF")); }
+    if (it.toggle) { it.on = !it.on; msg = L(it.name) + ": " + OnTxt(it.on); msgUntil = GetTickCount() + 2500; }
     if (it.act) it.act();
 }
 
@@ -330,15 +398,20 @@ static void DrawMenu()
     {
         bool s = (i == sel);
         Rect(x, y, w, h, s ? 190 : 0, 0, 0, s ? 230 : 210);
-        Txt(items[i].name.c_str(), x + 0.006f, y + 0.003f, 0.32f, 255, 255, 255);
+        std::string nm = (i == iBoost) ? std::string("FPS Booster: ") + boostNames[lang][boost] : L(items[i].name);
+        Txt(nm.c_str(), x + 0.006f, y + 0.003f, 0.32f, 255, 255, 255);
         if (items[i].toggle)
-            Txt(items[i].on ? "[ON]" : "[OFF]", x + w - 0.006f, y + 0.003f, 0.32f,
+        {
+            std::string st = std::string("[") + OnTxt(items[i].on) + "]";
+            Txt(st.c_str(), x + w - 0.006f, y + 0.003f, 0.32f,
                 items[i].on ? 50 : 150, items[i].on ? 205 : 150, items[i].on ? 50 : 150, 0, true);
+        }
         y += h;
     }
     Rect(x, y, w, 0.03f, 8, 8, 8, 235);
     char b[96];
-    sprintf(b, "%d/%d   D-Pad | A = Select | B = Close", sel + 1, (int)items.size());
+    sprintf(b, lang ? "%d/%d   Steuerkreuz | A = OK | B = Zu" : "%d/%d   D-Pad | A = Select | B = Close",
+            sel + 1, (int)items.size());
     Txt(b, x + 0.006f, y + 0.004f, 0.27f, 190, 190, 190);
 }
 
@@ -401,6 +474,7 @@ static void Update()
     if (kF3) CycleBoost();
     if (kF2) items[iFps].on = !items[iFps].on;
     if (kF5) DoAntiLag();
+    if (KeyJust(VK_F6)) { lang = 1 - lang; SaveLang(); Notify(lang ? "Sprache: Deutsch" : "Language: English"); }
 
     // controller: hold R (RB) + button
     bool rb = PadP(206);
@@ -423,7 +497,7 @@ static void Update()
     if (On(iFps))
     {
         char b[64];
-        sprintf(b, "FPS %d  |  Boost %s", (int)fpsSmooth, boostNames[boost]);
+        sprintf(b, "FPS %d  |  Boost %s", (int)fpsSmooth, boostNames[lang][boost]);
         int g = fpsSmooth >= 55 ? 205 : (fpsSmooth >= 30 ? 220 : 40);
         int r = fpsSmooth >= 55 ? 50 : 255;
         Txt(b, 0.995f, 0.005f, 0.32f, r, g, 40, 0, true);
@@ -435,6 +509,7 @@ static void Update()
 
 static void ScriptMain()
 {
+    LoadLang();
     Build();
     Notify("3rr0r Story Client loaded - R + Left / F4");
     while (true) { Update(); scriptWait(0); }

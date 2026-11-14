@@ -17,11 +17,12 @@ No .NET, no Mono, no ScriptHookVDotNet required.
 - Teleport to waypoint, repair vehicle, skyfall
 - 20 vehicles with descriptions, including 6 military vehicles (tank, fighter jet, helicopter, …)
 - Keyboard **and** controller support (Xbox / Nintendo Switch Pro via Steam Input)
+- **English / German** menu (switch with F6 or the menu entry, saved in `3rr0rClient.ini`)
 
 **Performance**
 - **FPS counter** (top right)
-- **FPS Booster** with 4 levels: reduces traffic, lowers the model budget and removes distant ambient cars and pedestrians
-- **Anti-Lag Protection**: detects stutter or low FPS and automatically turns off heavy cheats, clears your wanted level and switches the booster to ULTRA
+- **FPS Booster** with 4 levels: lowers traffic density and the model budget and removes distant **empty** cars. **NPCs are never deleted**, so the city stays alive
+- **Anti-Lag Protection**: detects stutter or low FPS and automatically turns off heavy cheats, clears your wanted level and switches the booster to HIGH
 
 ---
 
@@ -54,6 +55,7 @@ Inside the menu: **D-Pad ↑/↓** to navigate, **A** to select, **B** to close.
 | F3 | FPS Booster level |
 | F2 | FPS counter on/off |
 | F5 | Run Anti-Lag now |
+| F6 | Switch language (English / Deutsch) |
 | ↑ / ↓ | Navigate |
 | Enter | Select |
 | Backspace | Close menu |
