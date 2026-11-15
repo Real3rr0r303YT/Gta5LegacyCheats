@@ -102,6 +102,22 @@ WINEDLLOVERRIDES="dinput8=n,b" %command%
 
 ---
 
+## Fix stutter while driving / flying
+
+Fast vehicles (cars, jets, helicopters) force GTA to stream new map areas constantly. On integrated GPUs this causes stutter.
+Close GTA V and run:
+
+```bash
+./tools/optimize.sh
+```
+
+It backs up your `settings.xml` and turns off *High Detail Streaming While Flying*, extended distance scaling, long shadows and other heavy options.
+Restore with `./tools/optimize.sh restore`.
+
+On AMD integrated graphics also raise **UMA Frame Buffer Size** to **4G** in the BIOS.
+
+---
+
 ## Extra FPS on weak GPUs (optional)
 
 On integrated graphics, FSR upscaling with gamescope gives the biggest boost:
